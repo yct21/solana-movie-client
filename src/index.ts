@@ -1,5 +1,5 @@
 import * as web3 from '@solana/web3.js'
-import * as borsh from '@project-serum/borsh'
+import * as borsh from 'borsh'
 import * as fs from 'fs'
 import dotenv from 'dotenv'
 dotenv.config()
@@ -27,27 +27,24 @@ async function airdropSolIfNeeded(signer: web3.Keypair, connection: web3.Connect
     }
 }
 
-const movieInstructionLayout = borsh.struct([
-    borsh.u8('variant'),
-    borsh.str('title'),
-    borsh.u8('rating'),
-    borsh.str('description')
-])
+const movieInstructionSchema: borsh.Schema =
+{
+    enum: [
+        { 'struct': { 'AddMovieReview': { struct: { title: 'string', rating: 'u8', description: 'string' } } } },
+        { 'struct': { 'UpdateMovieReview': { struct: { title: 'string', rating: 'u8', description: 'string' } } } },
+    ]
+}
 
 async function sendTestMovieReview(signer: web3.Keypair, programId: web3.PublicKey, connection: web3.Connection) {
-    let buffer = Buffer.alloc(1000)
-    const movieTitle = `Braveheart${Math.random()*1000000}`
-    movieInstructionLayout.encode(
-        {
-            variant: 0,
+    const movieTitle = `Braveheart${Math.random() * 1000000}`
+    const review = borsh.serialize(movieInstructionSchema, {
+        AddMovieReview: {
             title: movieTitle,
             rating: 5,
             description: 'A great movie'
-        },
-        buffer
-    )
-
-    buffer = buffer.slice(0, movieInstructionLayout.getSpan(buffer))
+        }
+    })
+    const buffer = Buffer.from(review)
 
     const [pda] = await web3.PublicKey.findProgramAddress(
         [signer.publicKey.toBuffer(), Buffer.from(movieTitle)],
